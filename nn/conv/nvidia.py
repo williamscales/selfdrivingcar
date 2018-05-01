@@ -13,7 +13,7 @@ from keras import backend as K
 
 class NvidiaNet:
     @staticmethod
-    def build(width, height, depth, classes):
+    def build(width, height, depth):
         model = Sequential()
         input_shape = (height, width, depth)
 
