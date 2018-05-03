@@ -37,16 +37,10 @@ class PS4Controller:
 
     def listen(self):
         """Listen for events to happen"""
-
-        start_millis = int(round(time.time() * 1000))
-        while True:
-            for event in pygame.event.get():
-                if event.type == pygame.JOYAXISMOTION:
-                    self.axis_data[event.axis] = round(event.value, 2)
-                    return self.axis_data
-                now_millis = int(round(time.time() * 1000))
-                if now_millis - start_millis > 4:
-                    return self.axis_data
+        for event in pygame.event.get():
+            if event.type == pygame.JOYAXISMOTION:
+                self.axis_data[event.axis] = round(event.value, 2)
+        return self.axis_data
 
 
 if __name__ == "__main__":

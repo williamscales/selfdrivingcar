@@ -1,4 +1,6 @@
+import csv
 import sys
+import os.path
 import http.client
 
 from PyQt5 import uic, QtWidgets
@@ -37,9 +39,13 @@ class RunningScreen(QtWidgets.QDialog, Ui_Running_screen):
     LEVEL_SPEED = [0, LEVEL1_SPEED, LEVEL2_SPEED, LEVEL3_SPEED,
                    LEVEL4_SPEED, LEVEL5_SPEED]
 
-    def __init__(self):
+    def __init__(self, image_path, log_path):
+        self.base_image_path = image_path
+        self.log_path = log_path
+        self.state = {'steering': 90, 'throttle': 0}
         QtWidgets.QDialog.__init__(self)
         Ui_Running_screen.__init__(self)
+        self.image_counter = 0
         self.setupUi(self)
         self.controller = PS4Controller()
         self.controller.init()
@@ -80,20 +86,25 @@ class RunningScreen(QtWidgets.QDialog, Ui_Running_screen):
         print(f'raw steering={raw_steering}, converted steering={converted_steering}')
         print(f'raw throttle={raw_throttle}, converted_throttle={converted_throttle}')
         run_speed(converted_throttle)
+        direction = 1
         if raw_throttle < 0:
+            direction = -1
             run_action('forward')
         elif raw_throttle > 0:
+            direction = 1
             run_action('backward')
         else:
             run_action('stop')
         run_action(f'fwturn:{converted_steering}')
+        self.state['throttle'] = direction * converted_throttle
+        self.state['steering'] = converted_steering
 
     def convert_throttle(self, raw_throttle):
         """ [-1, 0] -> {0, 1, 2, 3, 4, 5} """
         lookup = [
-            (0.2, self.LEVEL1_SPEED),
-            (0.4, self.LEVEL2_SPEED),
-            (0.8, self.LEVEL3_SPEED),
+            (0.2, self.LEVEL3_SPEED),
+            (0.7, self.LEVEL4_SPEED),
+            (0.9, self.LEVEL5_SPEED),
         ]
         raw_throttle = abs(raw_throttle)
         if raw_throttle < lookup[0][0]:
@@ -123,12 +134,17 @@ class RunningScreen(QtWidgets.QDialog, Ui_Running_screen):
         """
         # use the buile-in function to query image from http, and save in data
         data = self.queryImage.queryImage()
-        if not data:
-                return None
-        pixmap = QPixmap()
-        # get pixmap type data from http type data
-        pixmap.loadFromData(data)
-        return pixmap
+        image_path = os.path.join(self.base_image_path, f'{self.image_counter}.jpg')
+        self.image_counter += 1
+        with open(image_path, 'wb') as f:
+            f.write(data)
+        return image_path
+        # if not data:
+        #         return None
+        # pixmap = QPixmap()
+        # # get pixmap type data from http type data
+        # pixmap.loadFromData(data)
+        # return pixmap
 
     def reflash_frame(self):
         """Reflash frame on widget label_snapshot
@@ -140,12 +156,21 @@ class RunningScreen(QtWidgets.QDialog, Ui_Running_screen):
                 None
         """
         # this pixmap is the received and converted picture
-        pixmap = self.transToPixmap()
-        if pixmap:
-            # show the pixmap on widget label_snapshot
-            self.label_snapshot.setPixmap(pixmap)
-        else:
-            print("frame lost")
+        image_path = self.transToPixmap()
+        with open(self.log_path, 'a') as f:
+            log_writer = csv.writer(f)
+            log_writer.writerow([
+                image_path,
+                self.state['throttle'],
+                self.state['steering'],
+            ])
+        return image_path
+
+        # if pixmap:
+        #     # show the pixmap on widget label_snapshot
+        #     self.label_snapshot.setPixmap(pixmap)
+        # else:
+        #     print("frame lost")
 
 
 class QueryImage:
@@ -266,10 +291,16 @@ def run_speed(speed):
 
 def app():
     app = QtWidgets.QApplication(sys.argv)
+    image_path = sys.argv[1]
+    log_path = sys.argv[2]
 
     # creat objects
-    running1 = RunningScreen()
+    running1 = RunningScreen(image_path, log_path)
     running1.start_stream()
     running1.show()
 
     app.exec_()
+
+
+if __name__ == '__main__':
+    app()
