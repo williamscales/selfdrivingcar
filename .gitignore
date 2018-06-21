@@ -1,8 +1,11 @@
 # training data
+*.hdf5
 
 training/log.csv
 
 training/imgs/
+
+from_car/
 
 # emacs
 *~

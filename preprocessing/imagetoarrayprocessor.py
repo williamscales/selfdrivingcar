@@ -1,8 +1,8 @@
 from keras.preprocessing.image import img_to_array
 
 
-class ImageToArrayPreProcessor:
-    def __init__(self, data_format: bool=True) -> None:
+class ImageToArrayPreprocessor:
+    def __init__(self, data_format=None) -> None:
         self.data_format = data_format
 
     def preprocess(self, image):

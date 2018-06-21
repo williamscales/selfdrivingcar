@@ -1,9 +1,7 @@
 import argparse
 import sys
-from time import time
 
 from imutils import paths
-from keras.callbacks import TensorBoard
 from keras.optimizers import SGD, Adam
 from keras.preprocessing.image import ImageDataGenerator
 import matplotlib.pyplot as plt
@@ -25,13 +23,13 @@ from nn.conv import (
     TinyNet,
 )
 
-# img_rows = 24
-# img_cols = 32
-img_rows = 640
-img_cols = 480
+img_rows = 20
+img_cols = 32
+# img_rows = 240
+# img_cols = 320
 
-learning_rate = 0.001
-batch_size = 128
+learning_rate = 0.02
+batch_size = 32
 nb_epoch = 50
 
 
@@ -75,6 +73,11 @@ def main(argv=None):
         verbose=True,
     )
     data = data.astype('float32')
+    import ipdb; ipdb.set_trace()
+
+    # # horizontal reflection for augmentation
+    # data = np.append(data, data[:, :, ::-1], axis=0)
+    # labels = np.append(labels, -labels, axis=0)
 
     # split train and validation
     data, labels = shuffle(data, labels)
@@ -84,40 +87,46 @@ def main(argv=None):
         random_state=13,
         test_size=0.1,
     )
+    # x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
+    # x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
+
+    lb = LabelBinarizer()
+    y_train = lb.fit_transform(y_train)
+    y_test = lb.transform(y_test)
+
+    label_names = ['straight', 'left', 'right']
 
     aug = ImageDataGenerator(
-        rotation_range=10,
-        width_shift_range=0.2,
-        height_shift_range=0.2,
-        zoom_range=0.3,
+        rotation_range=1,
+        width_shift_range=0.1,
+        height_shift_range=0.1,
+        zoom_range=0.2,
         horizontal_flip=False,
         fill_mode="nearest",
     )
 
     print('[INFO] compiling model...')
-    model = NvidiaNet.build(width=img_cols, height=img_rows, depth=3)
-    # model = TinyNet.build(width=img_cols, height=img_rows, depth=3)
+    # model = NvidiaNet.build(width=img_cols, height=img_rows, depth=1)
+    # model = TinyNet.build(width=img_cols, height=img_rows, depth=1)
     # model = ShallowNet.build(width=img_cols, height=img_rows, depth=1, classes=len(label_names))
-    # model = MiniVGGNet.build(width=img_cols, height=img_rows, depth=1, classes=len(label_names))
+    model = MiniVGGNet.build(width=img_cols, height=img_rows, depth=1, classes=len(label_names))
 
-    # opt = SGD(lr=learning_rate, momentum=0.9, decay=learning_rate/nb_epoch, nesterov=True)
+    opt = SGD(lr=learning_rate, momentum=0.9, decay=learning_rate/nb_epoch, nesterov=True)
     # opt = SGD(lr=learning_rate)
-    opt = Adam(lr=learning_rate)
-    model.compile(
-        loss='mean_squared_error',
-        metrics=["accuracy"],
-        optimizer=opt,
-    )
+    # opt = Adam(lr=learning_rate)
     # model.compile(
-    #     loss='categorical_crossentropy',
-    #     metrics=['accuracy'],
+    #     loss='mean_squared_error',
+    #     metrics=["accuracy"],
     #     optimizer=opt,
     # )
-    tensorboard = TensorBoard(log_dir="logs/{}".format(time()))
+    model.compile(
+        loss='categorical_crossentropy',
+        metrics=['accuracy'],
+        optimizer=opt,
+    )
 
     history = model.fit_generator(
         aug.flow(x_train, y_train, batch_size=batch_size),
-        callbacks=[tensorboard],
     # history = model.fit(
     #     x_train, y_train,
         nb_epoch=nb_epoch,
@@ -127,12 +136,12 @@ def main(argv=None):
         validation_data=(x_test, y_test),
     )
 
-    # predictions = model.predict(x_test, batch_size=batch_size)
-    # print(classification_report(
-    #     y_test.argmax(axis=1),
-    #     predictions.argmax(axis=1),
-    #     target_names=label_names,
-    # ))
+    predictions = model.predict(x_test, batch_size=batch_size)
+    print(classification_report(
+        y_test.argmax(axis=1),
+        predictions.argmax(axis=1),
+        target_names=label_names,
+    ))
 
     plt.style.use("ggplot")
     fig, ax_acc = plt.subplots(1, 1)
